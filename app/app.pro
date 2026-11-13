@@ -551,7 +551,7 @@ win32 {
     QMAKE_TARGET_PRODUCT = Moonlight Multi-Session
 
     CONFIG -= embed_manifest_exe
-    QMAKE_LFLAGS += /MANIFEST:embed /MANIFESTINPUT:$${PWD}/Moonlight.exe.manifest
+    QMAKE_LFLAGS += /MANIFEST:embed /MANIFESTINPUT:$$shell_quote($${PWD}/Moonlight.exe.manifest)
 }
 macx {
     # Create Info.plist in object dir with the correct version string
