@@ -1,4 +1,15 @@
-# Moonlight PC
+# Moonlight Multi-Session
+
+Moonlight Multi-Session is a Skedd Systems development fork of Moonlight PC for Windows on ARM. Its goal is to keep desktop streams to Cortex, Fyre, and Greyshift connected in one tabbed client. The current development branch still uses one stream per process.
+
+- [User guide](HUMAN.md)
+- [Windows ARM64 development build](docs/windows-arm64.md)
+- [Multi-session architecture](docs/multi-session.md)
+- [Baseline verification](docs/verification/2026-11-12-baseline.md)
+
+The Windows installer uses a separate product identity and settings location. See the user guide for the current installation status. The sections below describe upstream Moonlight PC.
+
+## Upstream Moonlight PC
 
 [Moonlight PC](https://moonlight-stream.org) is an open source PC client for NVIDIA GameStream and [Sunshine](https://github.com/LizardByte/Sunshine).
 

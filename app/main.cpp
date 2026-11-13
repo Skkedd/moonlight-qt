@@ -285,8 +285,9 @@ LONG WINAPI UnhandledExceptionHandler(struct _EXCEPTION_POINTERS *ExceptionInfo)
     }
 
     WCHAR dmpFileName[MAX_PATH];
-    swprintf_s(dmpFileName, L"%ls\\Moonlight-%I64u.dmp",
-               (PWCHAR)QDir::toNativeSeparators(Path::getLogDir()).utf16(), QDateTime::currentSecsSinceEpoch());
+    swprintf_s(dmpFileName, L"%ls\\MoonlightMultiSession-%lu-%I64d.dmp",
+               (PWCHAR)QDir::toNativeSeparators(Path::getLogDir()).utf16(),
+               GetCurrentProcessId(), QDateTime::currentSecsSinceEpoch());
     QString qDmpFileName = QString::fromUtf16((const char16_t*)dmpFileName);
     HANDLE dumpHandle = CreateFileW(dmpFileName, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (dumpHandle != INVALID_HANDLE_VALUE) {
@@ -428,9 +429,14 @@ int main(int argc, char *argv[])
     // Set these here to allow us to use the default QSettings constructor.
     // These also ensure that our cache directory is named correctly. As such,
     // it is critical that these be called before Path::initialize().
+#ifdef Q_OS_WIN32
+    QCoreApplication::setOrganizationName("Skedd Systems");
+    QCoreApplication::setApplicationName("Moonlight Multi-Session");
+#else
     QCoreApplication::setOrganizationName("Moonlight Game Streaming Project");
     QCoreApplication::setOrganizationDomain("moonlight-stream.com");
     QCoreApplication::setApplicationName("Moonlight");
+#endif
 
     if (QFile(QDir::currentPath() + "/portable.dat").exists()) {
         QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -458,13 +464,20 @@ int main(int argc, char *argv[])
 
 #ifdef LOG_TO_FILE
     QDir tempDir(Path::getLogDir());
+    const auto logTimestamp = QDateTime::currentSecsSinceEpoch();
 
 #ifdef Q_OS_WIN32
+    const QString logName = QStringLiteral("MoonlightMultiSession-%1-%2.log")
+        .arg(logTimestamp).arg(GetCurrentProcessId());
+    const QString logPattern = QStringLiteral("MoonlightMultiSession-*.log");
     // Only log to a file if the user didn't redirect stderr somewhere else
     if (IS_UNSPECIFIED_HANDLE(oldConErr))
+#else
+    const QString logName = QStringLiteral("Moonlight-%1.log").arg(logTimestamp);
+    const QString logPattern = QStringLiteral("Moonlight-*.log");
 #endif
     {
-        s_LoggerFile = new QFile(tempDir.filePath(QString("Moonlight-%1.log").arg(QDateTime::currentSecsSinceEpoch())));
+        s_LoggerFile = new QFile(tempDir.filePath(logName));
 
         // The log directory may be shared with other users (/tmp on macOS), so
         // we must never open a file or symlink that someone else planted there.
@@ -506,7 +519,7 @@ int main(int argc, char *argv[])
 
 #ifdef LOG_TO_FILE
     // Prune the oldest existing logs if there are more than 10
-    QStringList existingLogNames = tempDir.entryList(QStringList("Moonlight-*.log"), QDir::NoFilter, QDir::SortFlag::Time);
+    QStringList existingLogNames = tempDir.entryList(QStringList(logPattern), QDir::NoFilter, QDir::SortFlag::Time);
     for (int i = 10; i < existingLogNames.size(); i++) {
         qInfo() << "Removing old log file:" << existingLogNames.at(i);
         QFile(tempDir.filePath(existingLogNames.at(i))).remove();
@@ -724,8 +737,9 @@ int main(int argc, char *argv[])
     // Set our app name for SDL to use with PulseAudio and PipeWire. This matches what we
     // provide as our app name to libsoundio too. On SDL 2.0.18+, SDL_APP_NAME is also used
     // for screensaver inhibitor reporting.
-    SDL_SetHint(SDL_HINT_AUDIO_DEVICE_APP_NAME, "Moonlight");
-    SDL_SetHint(SDL_HINT_APP_NAME, "Moonlight");
+    const QByteArray applicationName = QCoreApplication::applicationName().toUtf8();
+    SDL_SetHint(SDL_HINT_AUDIO_DEVICE_APP_NAME, applicationName.constData());
+    SDL_SetHint(SDL_HINT_APP_NAME, applicationName.constData());
 
     // SDL will try to lock the mouse cursor on Wayland if it's not visible in order to
     // support applications that assume they can warp the cursor (which isn't possible

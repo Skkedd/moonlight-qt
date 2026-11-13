@@ -139,14 +139,25 @@ if /I "%VC_ARCH%" NEQ "%PROCESSOR_ARCHITECTURE%" (
 rem Find Visual Studio and run vcvarsall.bat
 call "%SOURCE_ROOT%\scripts\find-vswhere.bat"
 if !ERRORLEVEL! NEQ 0 goto Error
-for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`) do (
-    call "%%i\VC\Auxiliary\Build\vcvarsall.bat" %VC_ARCH%
+set VS_REQUIREMENTS=
+if /I "%ARCH%" EQU "arm64" set VS_REQUIREMENTS=-requires Microsoft.VisualStudio.Component.VC.Tools.ARM64
+set VS_INSTALLATION=
+for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -products * %VS_REQUIREMENTS% -property installationPath`) do set "VS_INSTALLATION=%%i"
+if not defined VS_INSTALLATION (
+    echo No Visual Studio or Build Tools installation matches the required %ARCH% compiler.
+    exit /b 1
 )
+call "%VS_INSTALLATION%\VC\Auxiliary\Build\vcvarsall.bat" %VC_ARCH%
+if !ERRORLEVEL! NEQ 0 goto Error
 if !ERRORLEVEL! NEQ 0 goto Error
 
 rem Find VC redistributable DLLs
-for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -find VC\Redist\MSVC\*\%ARCH%\Microsoft.VC*.CRT`) do set VC_REDIST_DLL_PATH=%%i
-if !ERRORLEVEL! NEQ 0 goto Error
+set VC_REDIST_DLL_PATH=
+for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -products * %VS_REQUIREMENTS% -find VC\Redist\MSVC\*\%ARCH%\Microsoft.VC*.CRT`) do set "VC_REDIST_DLL_PATH=%%i"
+if not defined VC_REDIST_DLL_PATH (
+    echo Missing Visual C++ redistributable files for %ARCH%.
+    exit /b 1
+)
 
 echo Cleaning output directories
 rmdir /s /q %DEPLOY_FOLDER%
@@ -196,6 +207,14 @@ pushd %BUILD_FOLDER%
 !JOM_CMD! %BUILD_CONFIG%
 if !ERRORLEVEL! NEQ 0 goto Error
 popd
+
+if /I "%ARCH%" EQU "arm64" (
+    dumpbin /headers "%BUILD_FOLDER%\app\%BUILD_CONFIG%\Moonlight.exe" | findstr /I /R /C:"^[ ]*AA64 " >nul
+    if !ERRORLEVEL! NEQ 0 (
+        echo Moonlight.exe does not report an ARM64 PE header.
+        exit /b 1
+    )
+)
 
 echo Saving PDBs
 for /r "%BUILD_FOLDER%" %%f in (*.pdb) do (
